@@ -49,6 +49,16 @@ struct SettingsView: View {
                     }
                 }
             }
+            
+            Section {
+                HStack {
+                    Spacer()
+                    Text("Versie 0.1")
+                        .foregroundColor(.secondary)
+                        .font(.footnote)
+                    Spacer()
+                }
+            }
         }
         .navigationTitle("Instellingen")
         .onAppear {
