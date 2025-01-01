@@ -4,7 +4,7 @@ struct WeekdaySelector: View {
     @Binding var selectedDays: [Int]
     
     private let weekdays = [
-        "Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"
+        "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"
     ]
     
     var body: some View {

@@ -94,7 +94,7 @@ struct HighlightBox: View {
                 
                 ZStack(alignment: .leading) {
                     if highlight.text.isEmpty {
-                        Text("Voer een highlight in")
+                        Text(LocalizedStrings.enterHighlight.localized)
                             .foregroundColor(.gray)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 8)

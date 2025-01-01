@@ -31,58 +31,29 @@ struct PastView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(groupedHighlights.keys.sorted(by: >), id: \.self) { date in
-                    Section(header: Text(formatDate(date))) {
-                        if let dayHighlights = groupedHighlights[date] {
-                            ForEach(dayHighlights) { highlight in
-                                Text(highlight.text)
-                                    .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) {
-                                            highlightToDelete = highlight
-                                            showingDeleteConfirmation = true
-                                        } label: {
-                                            Label("Verwijder", systemImage: "trash")
-                                        }
-                                    }
-                                    .swipeActions(edge: .leading) {
-                                        Button {
-                                            editHighlight(highlight)
-                                        } label: {
-                                            Label("Bewerk", systemImage: "pencil")
-                                        }
-                                        .tint(.blue)
-                                    }
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Eerdere Highlights")
+            HighlightsList(
+                groupedHighlights: groupedHighlights,
+                onDelete: { highlight in
+                    highlightToDelete = highlight
+                    showingDeleteConfirmation = true
+                },
+                onEdit: editHighlight
+            )
+            .navigationTitle(LocalizedStrings.previousHighlights.localized)
         }
         .sheet(item: $highlightToEdit) { highlight in
-            NavigationStack {
-                Form {
-                    TextField("Highlight", text: $editText)
-                }
-                .navigationTitle("Bewerk Highlight")
-                .navigationBarItems(
-                    leading: Button("Annuleer") {
-                        highlightToEdit = nil
-                    },
-                    trailing: Button("Opslaan") {
-                        highlight.text = editText
-                        highlightToEdit = nil
-                    }
-                )
-            }
+            EditHighlightView(
+                highlight: highlight,
+                editText: $editText,
+                onDismiss: { highlightToEdit = nil }
+            )
         }
         .confirmationDialog(
-            "Weet je zeker dat je deze highlight wilt verwijderen?",
+            LocalizedStrings.deleteConfirmation.localized,
             isPresented: $showingDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Verwijderen", role: .destructive) {
+            Button(LocalizedStrings.delete.localized, role: .destructive) {
                 if let highlight = highlightToDelete {
                     deleteHighlight(highlight)
                 }
@@ -131,6 +102,84 @@ struct PastView: View {
                     todayHighlight.text = highlight.text
                 }
             }
+        }
+    }
+}
+
+// MARK: - Subviews
+private struct HighlightsList: View {
+    let groupedHighlights: [Date: [Highlight]]
+    let onDelete: (Highlight) -> Void
+    let onEdit: (Highlight) -> Void
+    
+    var body: some View {
+        List {
+            ForEach(groupedHighlights.keys.sorted(by: >), id: \.self) { date in
+                if let dayHighlights = groupedHighlights[date] {
+                    Section(header: Text(formatDate(date))) {
+                        ForEach(dayHighlights) { highlight in
+                            HighlightRow(
+                                highlight: highlight,
+                                onDelete: onDelete,
+                                onEdit: onEdit
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        return formatter.string(from: date)
+    }
+}
+
+private struct HighlightRow: View {
+    let highlight: Highlight
+    let onDelete: (Highlight) -> Void
+    let onEdit: (Highlight) -> Void
+    
+    var body: some View {
+        Text(highlight.text)
+            .swipeActions(edge: .trailing) {
+                Button(role: .destructive) {
+                    onDelete(highlight)
+                } label: {
+                    Label(LocalizedStrings.delete.localized, systemImage: "trash")
+                }
+            }
+            .swipeActions(edge: .leading) {
+                Button {
+                    onEdit(highlight)
+                } label: {
+                    Label(LocalizedStrings.edit.localized, systemImage: "pencil")
+                }
+                .tint(.blue)
+            }
+    }
+}
+
+private struct EditHighlightView: View {
+    let highlight: Highlight
+    @Binding var editText: String
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField(LocalizedStrings.enterHighlight.localized, text: $editText)
+            }
+            .navigationTitle(LocalizedStrings.edit.localized)
+            .navigationBarItems(
+                leading: Button(LocalizedStrings.cancel.localized, action: onDismiss),
+                trailing: Button(LocalizedStrings.done.localized) {
+                    highlight.text = editText
+                    onDismiss()
+                }
+            )
         }
     }
 } 
