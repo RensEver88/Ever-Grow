@@ -53,7 +53,7 @@ struct SettingsView: View {
             Section {
                 HStack {
                     Spacer()
-                    Text("Versie 0.1")
+                    Text("Versie 0.11")
                         .foregroundColor(.secondary)
                         .font(.footnote)
                     Spacer()

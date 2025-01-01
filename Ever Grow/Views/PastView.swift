@@ -13,12 +13,28 @@ struct PastView: View {
         ]
     ) private var highlights: [Highlight]
     
+    private var groupedHighlights: [Date: [Highlight]] {
+        let calendar = Calendar.current
+        
+        let dict = Dictionary(grouping: highlights) { highlight in
+            calendar.startOfDay(for: highlight.date)
+        }
+        
+        // Filter om alleen de eerste 3 highlights per dag te behouden
+        return dict.mapValues { highlights in
+            highlights
+                .sorted { $0.order < $1.order }
+                .prefix(3)
+                .map { $0 }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             List {
                 ForEach(groupedHighlights.keys.sorted(by: >), id: \.self) { date in
                     Section(header: Text(formatDate(date))) {
-                        if let dayHighlights = groupedHighlights[date]?.sorted(by: { $0.order < $1.order }) {
+                        if let dayHighlights = groupedHighlights[date] {
                             ForEach(dayHighlights) { highlight in
                                 Text(highlight.text)
                                     .swipeActions(edge: .trailing) {
@@ -81,12 +97,6 @@ struct PastView: View {
     @State private var showingDeleteConfirmation = false
     @State private var highlightToDelete: Highlight?
     
-    private var groupedHighlights: [Date: [Highlight]] {
-        Dictionary(grouping: highlights) { highlight in
-            Calendar.current.startOfDay(for: highlight.date)
-        }
-    }
-    
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .long
@@ -101,5 +111,26 @@ struct PastView: View {
     private func editHighlight(_ highlight: Highlight) {
         highlightToEdit = highlight
         editText = highlight.text
+        
+        // Als dit een permanente highlight is, update ook de Today versie
+        if highlight.isPermanent {
+            // Vereenvoudigde predicate
+            let descriptor = FetchDescriptor<Highlight>(
+                predicate: #Predicate<Highlight> { h in
+                    h.isToday
+                }
+            )
+            
+            if let todayHighlights = try? modelContext.fetch(descriptor) {
+                // Filter na het ophalen
+                let matchingHighlight = todayHighlights.first { h in
+                    h.isPermanent && h.order == highlight.order
+                }
+                
+                if let todayHighlight = matchingHighlight {
+                    todayHighlight.text = highlight.text
+                }
+            }
+        }
     }
 } 

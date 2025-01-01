@@ -12,17 +12,51 @@ struct HighlightBox: View {
         highlight.isToday
     }) private var highlights: [Highlight]
     
-    private var isProtectedFourthBox: Bool {
-        // Check of dit de vierde box is
-        guard highlight.order == 4 else { return false }
-        
-        // Check of alle eerste drie boxes tekst bevatten
-        return highlights.filter { $0.order <= 3 }
+    private var shouldAddNewBox: Bool {
+        // Check of de eerste drie boxes gevuld zijn
+        let topThreeFilled = highlights.filter { $0.order <= 3 }
             .allSatisfy { !$0.text.isEmpty }
+        
+        // Check of er een vierde box is
+        let hasFourthBox = highlights.contains { $0.order == 4 }
+        
+        return topThreeFilled && !hasFourthBox
     }
     
     private var allEightBoxesFilled: Bool {
         highlights.count == 8 && highlights.allSatisfy { !$0.text.isEmpty }
+    }
+    
+    private func checkAndRemoveEmptyBoxes() {
+        // Als één van de top 3 leeg is
+        if highlights.filter({ $0.order <= 3 }).contains(where: { $0.text.isEmpty }) {
+            // Verwijder alle lege boxes na de eerste drie
+            let emptyBoxesToRemove = highlights.filter { highlight in
+                highlight.order > 3 && highlight.text.isEmpty
+            }
+            
+            for highlight in emptyBoxesToRemove {
+                modelContext.delete(highlight)
+            }
+            
+            reorderHighlights()
+        }
+    }
+    
+    private func checkAndRemoveLowestEmptyBox() {
+        let emptyBoxes = highlights.filter { $0.text.isEmpty }
+        
+        // Als er meer dan één lege box is
+        if emptyBoxes.count > 1 {
+            // Vind de lege box met de hoogste order (laagste in de lijst)
+            if let boxToRemove = emptyBoxes.max(by: { $0.order < $1.order }) {
+                // Niet verwijderen als het één van de eerste drie is
+                if boxToRemove.order > 3 {
+                    modelContext.delete(boxToRemove)
+                    reorderHighlights()
+                }
+            }
+        }
     }
     
     var body: some View {
@@ -71,11 +105,18 @@ struct HighlightBox: View {
                         .frame(maxHeight: .infinity)
                         .focused($isFocused)
                         .onChange(of: highlight.text) { oldValue, newValue in
-                            checkAndAddNewHighlight()
                             if highlight.order <= 3 {
                                 syncWithPastHighlights()
+                                checkAndRemoveEmptyBoxes()
+                            }
+                            
+                            if newValue.isEmpty {
+                                checkAndRemoveLowestEmptyBox()
+                            } else {
+                                checkAndAddNewHighlight()
                             }
                         }
+                        .allowsHitTesting(!isEditing)
                 }
                 .padding(2)
                 .background(
@@ -91,13 +132,8 @@ struct HighlightBox: View {
                     Button {
                         isFocused = false // Verberg keyboard
                         
-                        // Verwijder alleen als:
-                        // - De textbox leeg is
-                        // - Niet één van de eerste drie
-                        // - Niet de beschermde vierde box
-                        if highlight.text.isEmpty && 
-                           highlight.order > 3 && 
-                           !isProtectedFourthBox {
+                        // Verwijder lege box (behalve de eerste drie)
+                        if highlight.text.isEmpty && highlight.order > 3 {
                             modelContext.delete(highlight)
                             reorderHighlights()
                         }
@@ -108,7 +144,7 @@ struct HighlightBox: View {
                     }
                 }
                 
-                if isEditing && highlight.order > 3 && !isProtectedFourthBox {
+                if isEditing && highlight.order > 3 {
                     Button {
                         modelContext.delete(highlight)
                         reorderHighlights()
@@ -188,21 +224,31 @@ struct HighlightBox: View {
             for (index, highlight) in highlights.enumerated() {
                 highlight.order = index + 1
             }
+            
+            // Check of we een nieuwe box moeten toevoegen na het herordenen
+            if highlights.count == 3 && highlights.allSatisfy({ !$0.text.isEmpty }) {
+                let newHighlight = Highlight(
+                    text: "",
+                    order: 4,
+                    isToday: true
+                )
+                modelContext.insert(newHighlight)
+            }
         }
     }
     
     private func checkAndAddNewHighlight() {
-        // Controleer of alle bestaande highlights tekst bevatten
-        let allFilled = highlights.allSatisfy { !$0.text.isEmpty }
-        
         // Als alle velden gevuld zijn en we hebben nog niet het maximum bereikt
-        if allFilled && highlights.count < 8 {
-            let newHighlight = Highlight(
-                text: "",
-                order: highlights.count + 1,
-                isToday: true
-            )
-            modelContext.insert(newHighlight)
+        if highlights.count < 8 {
+            let allFilled = highlights.allSatisfy { !$0.text.isEmpty }
+            if allFilled {
+                let newHighlight = Highlight(
+                    text: "",
+                    order: highlights.count + 1,
+                    isToday: true
+                )
+                modelContext.insert(newHighlight)
+            }
         }
     }
     
