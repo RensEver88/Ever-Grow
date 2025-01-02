@@ -40,6 +40,15 @@ struct PastView: View {
                 onEdit: editHighlight
             )
             .navigationTitle(LocalizedStrings.previousHighlights.localized)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Image(systemName: "gear")
+                    }
+                }
+            }
         }
         .sheet(item: $highlightToEdit) { highlight in
             EditHighlightView(

@@ -11,7 +11,7 @@ import SwiftData
 @main
 struct Ever_GrowApp: App {
     let container: ModelContainer
-    @State private var highlightManager: HighlightManager?
+    private let highlightManager: HighlightManager
     
     init() {
         do {
@@ -28,6 +28,9 @@ struct Ever_GrowApp: App {
                 for: schema,
                 configurations: [modelConfiguration]
             )
+            
+            // Initialize HighlightManager immediately
+            highlightManager = HighlightManager(modelContext: container.mainContext)
         } catch {
             fatalError("Could not initialize ModelContainer: \(error)")
         }
@@ -37,11 +40,6 @@ struct Ever_GrowApp: App {
         WindowGroup {
             MainTabView()
                 .modelContainer(container)
-                .onAppear {
-                    if highlightManager == nil {
-                        highlightManager = HighlightManager(modelContext: container.mainContext)
-                    }
-                }
         }
     }
 }

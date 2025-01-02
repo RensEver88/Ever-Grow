@@ -28,32 +28,43 @@ struct HighlightBox: View {
     }
     
     private func checkAndRemoveEmptyBoxes() {
-        // Als één van de top 3 leeg is
+        // If one of the top 3 is empty
         if highlights.filter({ $0.order <= 3 }).contains(where: { $0.text.isEmpty }) {
-            // Verwijder alle lege boxes na de eerste drie
-            let emptyBoxesToRemove = highlights.filter { highlight in
+            // Remove empty boxes after the first three, but keep at least one
+            let emptyBoxesAfterThree = highlights.filter { highlight in
                 highlight.order > 3 && highlight.text.isEmpty
             }
             
-            for highlight in emptyBoxesToRemove {
-                modelContext.delete(highlight)
+            // Only remove if there are at least 2 empty boxes beyond the first three
+            if emptyBoxesAfterThree.count > 1 {
+                // Keep the first empty box, remove the rest
+                let boxesToRemove = Array(emptyBoxesAfterThree.dropFirst())
+                
+                for highlight in boxesToRemove {
+                    modelContext.delete(highlight)
+                }
+                
+                reorderHighlights()
             }
-            
-            reorderHighlights()
         }
     }
     
     private func checkAndRemoveLowestEmptyBox() {
         let emptyBoxes = highlights.filter { $0.text.isEmpty }
         
-        // Als er meer dan één lege box is
+        // Only remove if there are more than one empty box
+        // AND there will still be at least one empty box left after removal
         if emptyBoxes.count > 1 {
-            // Vind de lege box met de hoogste order (laagste in de lijst)
+            // Find the empty box with the highest order (lowest in the list)
             if let boxToRemove = emptyBoxes.max(by: { $0.order < $1.order }) {
-                // Niet verwijderen als het één van de eerste drie is
+                // Don't remove if it's one of the first three
+                // AND don't remove if it's the only empty box beyond the first three
                 if boxToRemove.order > 3 {
-                    modelContext.delete(boxToRemove)
-                    reorderHighlights()
+                    let emptyBoxesAfterThree = highlights.filter { $0.order > 3 && $0.text.isEmpty }
+                    if emptyBoxesAfterThree.count > 1 {
+                        modelContext.delete(boxToRemove)
+                        reorderHighlights()
+                    }
                 }
             }
         }
