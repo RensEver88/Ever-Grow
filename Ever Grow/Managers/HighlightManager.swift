@@ -89,31 +89,45 @@ class HighlightManager {
         let descriptor = FetchDescriptor<Highlight>(
             predicate: #Predicate<Highlight> { highlight in
                 highlight.isToday
-            }
+            },
+            sortBy: [SortDescriptor(\Highlight.order)]
         )
         
         do {
             let highlights = try modelContext.fetch(descriptor)
             
-            // Save non-empty top 3 highlights to past
-            let topHighlights = highlights.filter { $0.order <= 3 && !$0.text.isEmpty }
-            for highlight in topHighlights {
-                let pastHighlight = Highlight(
-                    text: highlight.text,
-                    date: highlight.date, // Keep the original date
-                    order: highlight.order,
-                    isToday: false,
-                    isPermanent: highlight.isPermanent
-                )
-                modelContext.insert(pastHighlight)
+            // Filter eerst op de top 3 en niet-lege highlights
+            let topThreeHighlights = highlights
+                .filter { $0.order <= 3 && !$0.text.isEmpty }
+                .prefix(3)
+            
+            // Maak een snapshot van de huidige staat
+            let snapshotHighlights = Array(topThreeHighlights).map { highlight in
+                (order: highlight.order, text: highlight.text)
             }
             
-            // Delete all today's highlights
+            // Maak nieuwe past highlights met de exacte snapshot data
+            let pastHighlights = snapshotHighlights.map { snapshot in
+                Highlight(
+                    text: snapshot.text,
+                    date: Date(),
+                    order: snapshot.order,
+                    isToday: false,
+                    isPermanent: true
+                )
+            }
+            
+            // Verwijder alle highlights van vandaag
             for highlight in highlights {
                 modelContext.delete(highlight)
             }
             
-            // Create new empty highlights for today (only top 3)
+            // Voeg eerst alle past highlights toe
+            for highlight in pastHighlights {
+                modelContext.insert(highlight)
+            }
+            
+            // Maak nieuwe lege highlights voor vandaag
             createInitialHighlights()
             
             try modelContext.save()

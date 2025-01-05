@@ -29,17 +29,43 @@ struct PastView: View {
         }
     }
     
+    @State private var highlightToEdit: Highlight?
+    @State private var editText = ""
+    @State private var showingDeleteConfirmation = false
+    @State private var highlightToDelete: Highlight?
+    
+    private func deleteHighlight(_ highlight: Highlight) {
+        highlightToDelete = highlight
+        showingDeleteConfirmation = true
+    }
+    
+    private func confirmDelete() {
+        if let highlight = highlightToDelete {
+            withAnimation {
+                modelContext.delete(highlight)
+                try? modelContext.save()
+            }
+        }
+        highlightToDelete = nil
+        showingDeleteConfirmation = false
+    }
+    
     var body: some View {
         NavigationStack {
             HighlightsList(
                 groupedHighlights: groupedHighlights,
-                onDelete: { highlight in
-                    highlightToDelete = highlight
-                    showingDeleteConfirmation = true
-                },
+                onDelete: deleteHighlight,
                 onEdit: editHighlight
             )
             .navigationTitle(LocalizedStrings.previousHighlights.localized)
+            .alert(LocalizedStrings.deleteConfirmation.localized, isPresented: $showingDeleteConfirmation) {
+                Button(LocalizedStrings.cancel.localized, role: .cancel) {
+                    highlightToDelete = nil
+                }
+                Button(LocalizedStrings.delete.localized, role: .destructive) {
+                    confirmDelete()
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
@@ -57,35 +83,12 @@ struct PastView: View {
                 onDismiss: { highlightToEdit = nil }
             )
         }
-        .confirmationDialog(
-            LocalizedStrings.deleteConfirmation.localized,
-            isPresented: $showingDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button(LocalizedStrings.delete.localized, role: .destructive) {
-                if let highlight = highlightToDelete {
-                    deleteHighlight(highlight)
-                }
-                highlightToDelete = nil
-            }
-        }
     }
-    
-    @State private var highlightToEdit: Highlight?
-    @State private var editText = ""
-    @State private var showingEditDialog = false
-    @State private var showingDeleteConfirmation = false
-    @State private var highlightToDelete: Highlight?
     
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .long
         return formatter.string(from: date)
-    }
-    
-    private func deleteHighlight(_ highlight: Highlight) {
-        showingDeleteConfirmation = true
-        highlightToDelete = highlight
     }
     
     private func editHighlight(_ highlight: Highlight) {
@@ -151,13 +154,21 @@ private struct HighlightRow: View {
     let onDelete: (Highlight) -> Void
     let onEdit: (Highlight) -> Void
     
+    // Helper functie om te controleren of de highlight van vandaag is
+    private var isToday: Bool {
+        Calendar.current.isDateInToday(highlight.date)
+    }
+    
     var body: some View {
         Text(highlight.text)
             .swipeActions(edge: .trailing) {
-                Button(role: .destructive) {
-                    onDelete(highlight)
-                } label: {
-                    Label(LocalizedStrings.delete.localized, systemImage: "trash")
+                // Alleen delete toestaan als het niet van vandaag is
+                if !isToday {
+                    Button(role: .destructive) {
+                        onDelete(highlight)
+                    } label: {
+                        Label(LocalizedStrings.delete.localized, systemImage: "trash")
+                    }
                 }
             }
             .swipeActions(edge: .leading) {
