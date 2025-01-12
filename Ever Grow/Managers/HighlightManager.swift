@@ -85,49 +85,67 @@ class HighlightManager {
         try? modelContext.save()
     }
     
-    private func resetTodayHighlights() {
-        let descriptor = FetchDescriptor<Highlight>(
-            predicate: #Predicate<Highlight> { highlight in
-                highlight.isToday
-            },
-            sortBy: [SortDescriptor(\Highlight.order)]
-        )
-        
+    private func syncHighlights(_ highlights: [Highlight]) {
         do {
-            let highlights = try modelContext.fetch(descriptor)
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
             
-            // Filter eerst op de top 3 en niet-lege highlights
+            // 1. Verwijder eerst alle bestaande past highlights van vandaag
+            let pastDescriptor = FetchDescriptor<Highlight>(
+                predicate: #Predicate<Highlight> { highlight in
+                    highlight.isToday == false
+                }
+            )
+            let pastHighlights = try modelContext.fetch(pastDescriptor)
+            
+            // Verwijder alle past highlights van vandaag
+            pastHighlights
+                .filter { calendar.startOfDay(for: $0.date) == today }
+                .forEach { modelContext.delete($0) }
+            
+            // 2. Maak nieuwe exacte kopieën voor de top 3
             let topThreeHighlights = highlights
-                .filter { $0.order <= 3 && !$0.text.isEmpty }
-                .prefix(3)
+                .filter { $0.order <= 3 }
+                .sorted { $0.order < $1.order }
             
-            // Maak een snapshot van de huidige staat
-            let snapshotHighlights = Array(topThreeHighlights).map { highlight in
-                (order: highlight.order, text: highlight.text)
-            }
-            
-            // Maak nieuwe past highlights met de exacte snapshot data
-            let pastHighlights = snapshotHighlights.map { snapshot in
-                Highlight(
-                    text: snapshot.text,
-                    date: Date(),
-                    order: snapshot.order,
+            // Maak exacte kopieën
+            for highlight in topThreeHighlights {
+                let pastHighlight = Highlight(
+                    text: highlight.text,
+                    date: today,
+                    order: highlight.order,
                     isToday: false,
                     isPermanent: true
                 )
+                modelContext.insert(pastHighlight)
             }
             
-            // Verwijder alle highlights van vandaag
-            for highlight in highlights {
+            try modelContext.save()
+        } catch {
+            print("Error syncing highlights: \(error)")
+        }
+    }
+    
+    private func resetTodayHighlights() {
+        do {
+            // Haal alle today highlights op
+            let todayDescriptor = FetchDescriptor<Highlight>(
+                predicate: #Predicate<Highlight> { highlight in
+                    highlight.isToday
+                },
+                sortBy: [SortDescriptor(\Highlight.order)]
+            )
+            let todayHighlights = try modelContext.fetch(todayDescriptor)
+            
+            // Sync voordat we resetten
+            syncHighlights(todayHighlights)
+            
+            // Verwijder alle today highlights
+            for highlight in todayHighlights {
                 modelContext.delete(highlight)
             }
             
-            // Voeg eerst alle past highlights toe
-            for highlight in pastHighlights {
-                modelContext.insert(highlight)
-            }
-            
-            // Maak nieuwe lege highlights voor vandaag
+            // Maak nieuwe highlights
             createInitialHighlights()
             
             try modelContext.save()

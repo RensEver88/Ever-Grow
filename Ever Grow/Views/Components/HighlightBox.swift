@@ -264,36 +264,41 @@ struct HighlightBox: View {
     }
     
     private func syncWithPastHighlights() {
-        // Haal alle past highlights op
-        let descriptor = FetchDescriptor<Highlight>(
-            predicate: #Predicate<Highlight> { h in
-                !h.isToday
-            }
-        )
+        guard highlight.order <= 3 else { return }
+        
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
         
         do {
+            // 1. Verwijder eerst alle bestaande past highlights van vandaag voor deze order
+            let descriptor = FetchDescriptor<Highlight>(
+                predicate: #Predicate<Highlight> { h in
+                    h.isToday == false
+                }
+            )
             let pastHighlights = try modelContext.fetch(descriptor)
-            let calendar = Calendar.current
-            let today = calendar.startOfDay(for: Date())
             
-            // Filter voor vandaag en juiste order
-            let matchingHighlight = pastHighlights.first { h in
-                calendar.startOfDay(for: h.date) == today && h.order == highlight.order
-            }
+            // Verwijder bestaande past highlight voor deze order en datum
+            pastHighlights
+                .filter { h in
+                    calendar.startOfDay(for: h.date) == today && 
+                    h.order == highlight.order
+                }
+                .forEach { modelContext.delete($0) }
             
-            if let pastHighlight = matchingHighlight {
-                pastHighlight.text = highlight.text
-            } else {
-                let newPastHighlight = Highlight(
-                    text: highlight.text,
-                    date: Date(),
-                    order: highlight.order,
-                    isToday: false
-                )
-                modelContext.insert(newPastHighlight)
-            }
+            // 2. Maak een nieuwe exacte kopie
+            let newPastHighlight = Highlight(
+                text: highlight.text,
+                date: today,
+                order: highlight.order,
+                isToday: false,
+                isPermanent: true
+            )
+            modelContext.insert(newPastHighlight)
+            
+            try modelContext.save()
         } catch {
-            print("Error syncing highlights: \(error)")
+            print("Error syncing with past highlights: \(error)")
         }
     }
 }

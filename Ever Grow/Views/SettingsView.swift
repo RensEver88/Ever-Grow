@@ -74,7 +74,7 @@ struct SettingsView: View {
             Section {
                 HStack {
                     Spacer()
-                    Text("Version 0.3.2")
+                    Text("Version 0.4")
                         .foregroundColor(.secondary)
                         .font(.footnote)
                     Spacer()
